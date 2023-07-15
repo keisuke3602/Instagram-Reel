@@ -1,0 +1,72 @@
+var access_token = 'your access token';
+var instagram_account_id = "your Instagram IS";
+
+function instagramUploadVideo(){
+  var sheet = SpreadsheetApp.openById('Your Spreadsheet ID').getSheetByName('Reel');
+  var data = sheet.getDataRange().getValues();
+
+  var postedAll = true;
+  for (var i = 1; i < data.length; i++){
+    const author = data[i][0];
+    const quote1 = data[i][1];
+    const quote2 = data[i][2];
+    const quote3 = data[i][3];
+    const tag = data[i][4];
+    const text = data[i][5];
+    const link = data[i][6];
+    const video_url = data[i][7];
+    const status = data[i][8];
+
+    if (status == "Posted"){
+      continue;
+    }
+
+    const caption = '3 quotes from ' + author + ' ' + tag + '\n\n' + quote1 + '\n\n' + quote2 + '\n\n' + quote3 + '\n\n' + text + '\n' + link;
+
+    var createMediaUrl = 'https://graph.facebook.com/' + instagram_account_id + '/media';
+    var createMediaPayload = {
+      'video_url': video_url,
+      'media_type': 'VIDEO',
+      'caption': caption,
+      'access_token': access_token
+    };
+    var createMediaOptions = {
+      'method' : 'post',
+      'payload' : createMediaPayload
+    };
+    var createMediaResponse = UrlFetchApp.fetch(createMediaUrl, createMediaOptions);
+
+    var mediaId = JSON.parse(createMediaResponse.getContentText()).id;
+
+    Utilities.sleep(30000);
+
+    var publishMediaUrl = 'https://graph.facebook.com/' + instagram_account_id + '/media_publish';
+    var publishMediaPayload = {
+      'creation_id': mediaId,
+      'access_token': access_token
+    };
+
+    var publishMediaOptions = {
+      'method' : 'post',
+      'payload' : publishMediaPayload,
+      'muteHttpExceptions': true
+    };
+
+    var publishMediaResponse = UrlFetchApp.fetch(publishMediaUrl, publishMediaOptions);
+
+    if(JSON.parse(publishMediaResponse.getContentText()).id){
+      sheet.getRange(i+1,9).setValue('Posted');
+    }
+
+    Logger.log(publishMediaResponse.getContentText());
+    break;
+  }
+
+  if (postedAll){
+    Logger.log("No content to post");
+  }
+
+}
+
+
+
