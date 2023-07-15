@@ -1,0 +1,92 @@
+var PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----\n';
+var CLIENT_EMAIL = 'your service account';
+var SCOPE = 'https://www.googleapis.com/auth/devstorage.read_only';
+
+function getGcsData() {
+  var token = ScriptApp.getIdentityToken();
+  var url = "https://storage.googleapis.com/storage/v1/b/youtube_shorts/o";
+
+  var jwtToken = getJwtToken(CLIENT_EMAIL, PRIVATE_KEY, SCOPE);
+  
+  var options = {
+    headers: {
+      Authorization: 'Bearer ' + jwtToken,
+    },
+    method: 'GET',
+    muteHttpExceptions: true
+  };
+  
+  var response = UrlFetchApp.fetch(url, options);
+  var items = JSON.parse(response.getContentText()).items;
+  
+  var data = items.map(function(item) {
+    var fileName = item.name;
+    var publicUrl = 'https://storage.googleapis.com/your bucket name/' + encodeURIComponent(fileName);
+    return [fileName, publicUrl];
+  });
+
+  writeToSheet(data);
+  Logger.log(data);
+}
+
+function getJwtToken(clientEmail, privateKey, scope) {
+  var header = {
+    "alg": "RS256",
+    "typ": "JWT"
+  };
+  
+  var now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+  var claimSet = {
+    "iss": clientEmail,
+    "scope": scope,
+    "aud": "https://www.googleapis.com/oauth2/v4/token",
+    "exp": now + 3600, // Expires one hour from now
+    "iat": now
+  };
+  
+  var toSign = Utilities.base64EncodeWebSafe(JSON.stringify(header)) + "." +
+               Utilities.base64EncodeWebSafe(JSON.stringify(claimSet));
+  var signatureBytes = Utilities.computeRsaSha256Signature(toSign, privateKey);
+  var signature = Utilities.base64EncodeWebSafe(signatureBytes);
+  
+  var jwt = toSign + "." + signature;
+  
+  var tokenResponse = UrlFetchApp.fetch("https://www.googleapis.com/oauth2/v4/token", {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    payload: {
+      'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      'assertion': jwt
+    }
+  });
+  
+  var token = JSON.parse(tokenResponse.getContentText()).access_token;
+  return token;
+}
+
+function writeToSheet(data) {
+  var sheet = SpreadsheetApp.openById('your spreadsheet ID').getSheetByName('your spreadsheet name');
+  var lastRow = sheet.getLastRow();
+  var existingFileNames = sheet.getRange(1, 10, lastRow, 1).getValues().flat();
+  var lastHColumnRow = sheet.getRange(1, 8, lastRow, 1).getValues().filter(String).length;
+
+  data.forEach(function(item) {
+    var fileName = item[0];
+    var publicUrl = item[1];
+
+    if (existingFileNames.indexOf(fileName) === -1) {
+      lastHColumnRow++;
+
+      sheet.getRange(lastHColumnRow, 10).setValue(fileName);
+      sheet.getRange(lastHColumnRow, 8).setValue(publicUrl);
+    }
+  });
+}
+
+
+
+
+
+
